@@ -3,13 +3,18 @@
 #include<unistd.h>
 #include<sys/socket.h>
 #include<arpa/inet.h>
+#include<string.h>
 #include "webserver.h"
+
+#define BUFFER_SIZE 10240
 
 struct _webserver{
   struct sockaddr_in addr;
   int port;
   int server_fd;
 };
+
+int receive_request_data(int, char*);
 
 webserver* webserver_create(int port) {
   int server_fd;
@@ -68,11 +73,53 @@ int webserver_run(webserver *ws) {
     inet_ntop(AF_INET, &(client_addr.sin_addr), ip_addr, INET_ADDRSTRLEN);
     
     printf("Got connection from %s:%d\n", ip_addr, client_addr.sin_port);
+
+    char *buffer = (char*) malloc(BUFFER_SIZE * sizeof(char)+1);
+
+    int bytes_received = receive_request_data(client_fd, buffer);
+    if (bytes_received <=0 ) {
+      perror("unable to receive data from client");
+      continue;
+    }
+
+    printf("%s\n", buffer);
     fflush(stdout);
 
     close(client_fd);
-
+    free(buffer);
   }
 
   return 0;
+}
+
+int receive_request_data(int socket_fd, char* buffer) {
+  int total_bytes_received = 0;
+
+  while(1) {
+    ssize_t bytes_received = recv(socket_fd,
+                                  buffer+total_bytes_received,
+                                  BUFFER_SIZE - total_bytes_received,
+                                  0
+                                  );
+    if(bytes_received < 0) {
+      perror("unable to receive data from the socket");
+      return -1;
+    }
+    if(bytes_received == 0) {
+      break;
+    }
+    buffer[total_bytes_received+bytes_received] = 0;
+    // Detect end of http request
+    if(strstr(buffer+total_bytes_received, "\r\n\r\n")) {
+      total_bytes_received += bytes_received;
+      break;
+    }
+    total_bytes_received += bytes_received;
+
+    if(total_bytes_received >= BUFFER_SIZE){
+      break;
+    }
+  }
+
+  return total_bytes_received;
 }
