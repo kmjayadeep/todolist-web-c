@@ -14,7 +14,21 @@ struct _webserver{
   int server_fd;
 };
 
+struct _http_header {
+  char* key;
+  char* value;
+};
+
+struct _request {
+  char* method;
+  char* path;
+  http_header** headers;
+  int headers_count;
+  char* body;
+};
+
 int receive_request_data(int, char*);
+request* parse_request(const char*);
 
 webserver* webserver_create(int port) {
   int server_fd;
@@ -82,7 +96,17 @@ int webserver_run(webserver *ws) {
       continue;
     }
 
-    printf("%s\n", buffer);
+    request *req = parse_request(buffer);
+    printf("Method:<%s>\n", req->method);
+    printf("Path:<%s>\n", req->path);
+    printf("Headers:<%d>\n", req->headers_count);
+
+    for(int i=0; i < req->headers_count; i++) {
+      printf("%s:%s\n", req->headers[i]->key, req->headers[i]->value);
+    }
+
+    printf("Body:<%s>\n", req->body);
+
     fflush(stdout);
 
     close(client_fd);
@@ -122,4 +146,44 @@ int receive_request_data(int socket_fd, char* buffer) {
   }
 
   return total_bytes_received;
+}
+
+request* parse_request(const char* buffer) {
+  request *req = malloc(sizeof(*req));
+  char *rest = strdup(buffer);
+  char *token;
+
+  token = strtok_r(rest," ", &rest);
+  req->method = token;
+
+  token = strtok_r(rest," ", &rest);
+  req->path = token;
+
+  rest = strchr(rest, '\n') + 1;
+
+  char* pos = strstr(buffer, "\r\n\r\n");
+
+  int header_count = 0;
+  for(const char *p = buffer; p < pos; p++) {
+    if (*p=='\n') {
+      header_count++;
+    }
+  }
+  req->headers_count = header_count;
+  req->headers = malloc(header_count * sizeof(http_header));
+
+  int i=0;
+  while((token = strtok_r(rest, "\n", &rest))) {
+    if(token[0] == '\r') {
+      break;
+    }
+    http_header *head = malloc(sizeof(*head));
+    head->key = strtok_r(token, ":", &token);
+    head->value = token + 1;
+    req->headers[i++] = head;
+  }
+
+  req->body = rest;
+
+  return req;
 }

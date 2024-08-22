@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c11
+CFLAGS = -Wall -Wextra -std=gnu11
 LDFLAGS =
 SRC = main.c webserver.c
 OBJ = $(SRC:.c=.o)
