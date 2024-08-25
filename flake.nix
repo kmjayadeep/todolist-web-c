@@ -14,6 +14,7 @@
       {
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
+            cjson
             clang
             gnumake
             curl

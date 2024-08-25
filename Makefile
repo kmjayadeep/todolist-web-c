@@ -1,6 +1,6 @@
 CC = clang
 CFLAGS = -Wall -Wextra -O2 -pg
-LDFLAGS =
+LDFLAGS = -lcjson
 SRC = main.c webserver.c
 OBJ = $(SRC:.c=.o)
 EXEC = webserver

@@ -4,6 +4,7 @@
 #include<sys/socket.h>
 #include<arpa/inet.h>
 #include<string.h>
+#include <cjson/cJSON.h>
 #include "webserver.h"
 
 #define BUFFER_SIZE 10240
@@ -113,7 +114,7 @@ int webserver_run(webserver *ws) {
     if(handler) {
       handler(req);
     } else{
-      // TODO implement 404 route
+      response_send_text(req, STATUS_NOT_FOUND, "Uh oh! You are in the wrong place!");
     }
 
     fflush(stdout);
@@ -262,19 +263,36 @@ request_handler_func request_match_handler(request* req) {
   return NULL;
 }
 
-void request_send_text(request *req, int status, char *text) {
-  char *response = malloc(strlen(text) + 50);
-  // TODO handle other status types
-  char *status_text = "OK";
+void response_send(request *req, char *status, char* headers, char *body) {
+  char *response = malloc(strlen(body) + 50);
 
-  sprintf(response, "HTTP/1.1 %d %s\r\n"
-          "Content-Type: text/plain\r\n\r\n"
+  sprintf(response, "HTTP/1.1 %s\r\n"
+          "%s\n\r\n"
           "%s\r\n",
           status,
-          status_text,
-          text);
+          headers,
+          body);
 
-  write(req->client_fd, response, strlen(response));
+  if(write(req->client_fd, response, strlen(response)) <= 0) {
+    perror("unable to respond to the client\n");
+  }
 
   free(response);
+}
+
+void response_send_text(request *req, char* status, char *text) {
+  char headers[] = "Content-Type: text/plain";
+  response_send(req, status, headers, text);
+}
+
+void response_send_json(request *req, char* status, cJSON *json) {
+  char headers[] = "Content-Type: application/json";
+  char *body = cJSON_PrintUnformatted(json);
+  response_send(req, status, headers, body);
+  cJSON_free(body);
+}
+
+void response_send_html(request *req, char* status, char *html) {
+  char headers[] = "Content-Type: text/html";
+  response_send(req, status, headers, html);
 }
