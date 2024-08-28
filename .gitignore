@@ -55,3 +55,6 @@ webserver
 
 # database
 *.bin
+
+# nix
+result

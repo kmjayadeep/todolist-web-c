@@ -4,7 +4,7 @@
 #include <cjson/cJSON.h>
 #include "webserver.h"
 
-#define PORT 10001
+#define PORT 10000
 #define DB_NAME "todos.bin"
 
 typedef struct{
