@@ -4,27 +4,22 @@
 #include <cjson/cJSON.h>
 #include "webserver.h"
 
-#define PORT 10000
+#define PORT 10001
+#define DB_NAME "todos.bin"
 
 typedef struct{
   int id;
-  char *title;
+  char* title;
 } Todo;
 
-Todo* todo_list;
-size_t todo_list_count = 0;
-size_t todo_capacity = 100;
-
-void todos_add(char* title);
 void handle_get_todos(request*);
 void handle_post_todos(request*);
 void handle_index(request*);
 
-int main() {
-  todo_list = malloc(todo_capacity*sizeof(Todo));
-  todos_add("go shopping");
-  todos_add("buy pickles");
+void todos_add(char* title);
+Todo* todos_read(int *count);
 
+int main() {
   webserver *ws = webserver_create(PORT);
 
   webserver_handle_get(ws, "/", handle_index);
@@ -37,7 +32,10 @@ int main() {
 void handle_get_todos(request* req) {
   cJSON* json = cJSON_CreateArray();
 
-  for(size_t i = 0;i < todo_list_count; i++) {
+  int todo_list_count;
+  Todo* todo_list = todos_read(&todo_list_count);
+
+  for(int i = 0; i < todo_list_count; i++) {
     cJSON* item = cJSON_CreateObject();
     cJSON_AddNumberToObject(item, "id", todo_list[i].id);
     cJSON_AddStringToObject(item, "title", todo_list[i].title);
@@ -60,24 +58,14 @@ void handle_post_todos(request* req) {
   cJSON_Delete(json);
 }
 
-void todos_add(char* title) {
-  if(todo_list_count >= todo_capacity) {
-    todo_capacity *= 2;
-    todo_list = realloc(todo_list, todo_capacity * sizeof(Todo));
-  }
-
-  int index = todo_list_count;
-  todo_list[index].title = strdup(title);
-  todo_list[index].id = rand();
-  todo_list_count++;
-}
-
 void handle_index(request* req) {
   html_template *tmpl = template_create("templates/index.html");
   char todos_string[1000];
+  int todo_list_count;
+  Todo* todo_list = todos_read(&todo_list_count);
 
   int length = 0;
-  for(size_t i=0;i<todo_list_count; i++) {
+  for(int i=0;i<todo_list_count; i++) {
     length += sprintf(todos_string + length, "<li>%s</li>", todo_list[i].title);
   }
 
@@ -87,4 +75,77 @@ void handle_index(request* req) {
   response_send_html(req, STATUS_OK, html);
   free(html);
   template_free(tmpl);
+}
+
+Todo* todos_read(int *count) {
+  FILE *file = fopen(DB_NAME, "rb");
+  if (file == NULL) {
+    *count = 0;
+    return NULL;
+  }
+
+  if(fread(count, sizeof(int), 1, file) != 1) {
+    perror("unable to read todo count");
+    *count = 0;
+    return NULL;
+  }
+
+  Todo *todos = (Todo *)malloc(*count * sizeof(Todo));
+
+  for (int i = 0; i < *count; i++) {
+    if(fread(&todos[i].id, sizeof(int), 1, file) != 1){
+      perror("unable to read todo id");
+      break;
+    }
+
+    int len;
+    if(fread(&len, sizeof(int), 1, file) != 1 ){
+      perror("unable to read todo title length");
+      break;
+    }
+
+    todos[i].title = (char *)malloc(len * sizeof(char));
+
+    if(fread(todos[i].title, sizeof(char), len, file) != (unsigned long)len){
+      perror("unable to read todo title");
+      break;
+    }
+  }
+
+  fclose(file);
+  return todos;
+}
+
+void todos_add(char* title) {
+  Todo todo = {
+    .title = title
+  };
+  FILE *file = fopen(DB_NAME, "r+b");
+  int count = 0;
+  if (file == NULL) {
+    file = fopen(DB_NAME, "wb");
+    if (file == NULL) {
+      perror("Error creating file");
+      exit(EXIT_FAILURE);
+    }
+    fwrite(&count, sizeof(int), 1, file);
+  } else {
+    if (fread(&count, sizeof(int), 1, file) != 1) {
+      perror("Error reading count from file");
+      fclose(file);
+      exit(EXIT_FAILURE);
+    }
+  }
+
+  count++;
+  fseek(file, 0, SEEK_END);
+
+  fwrite(&todo.id, sizeof(int), 1, file);
+  int title_length = strlen(todo.title) + 1;
+  fwrite(&title_length, sizeof(int), 1, file);
+  fwrite(todo.title, sizeof(char), title_length, file);
+  fseek(file, 0, SEEK_SET);
+  fwrite(&count, sizeof(int), 1, file);
+
+  fclose(file);
 }
