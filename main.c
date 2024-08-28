@@ -1,4 +1,5 @@
 #include<stdio.h>
+#include<string.h>
 #include<stdlib.h>
 #include <cjson/cJSON.h>
 #include "webserver.h"
@@ -17,6 +18,7 @@ size_t todo_capacity = 100;
 void todos_add(char* title);
 void handle_get_todos(request*);
 void handle_post_todos(request*);
+void handle_index(request*);
 
 int main() {
   todo_list = malloc(todo_capacity*sizeof(Todo));
@@ -25,6 +27,7 @@ int main() {
 
   webserver *ws = webserver_create(PORT);
 
+  webserver_handle_get(ws, "/", handle_index);
   webserver_handle_get(ws, "/api/todo", handle_get_todos);
   webserver_handle_post(ws, "/api/todo", handle_post_todos);
 
@@ -42,6 +45,7 @@ void handle_get_todos(request* req) {
   }
 
   response_send_json(req, STATUS_OK, json);
+  cJSON_Delete(json);
 }
 
 void handle_post_todos(request* req) {
@@ -53,6 +57,7 @@ void handle_post_todos(request* req) {
   }else{
     response_send_text(req, STATUS_BAD_REQUEST, "Wrong input");
   }
+  cJSON_Delete(json);
 }
 
 void todos_add(char* title) {
@@ -62,7 +67,24 @@ void todos_add(char* title) {
   }
 
   int index = todo_list_count;
-  todo_list[index].title = title;
+  todo_list[index].title = strdup(title);
   todo_list[index].id = rand();
   todo_list_count++;
+}
+
+void handle_index(request* req) {
+  html_template *tmpl = template_create("templates/index.html");
+  char todos_string[1000];
+
+  int length = 0;
+  for(size_t i=0;i<todo_list_count; i++) {
+    length += sprintf(todos_string + length, "<li>%s</li>", todo_list[i].title);
+  }
+
+  template_add_var(tmpl, "todos", todos_string);
+  char* html = malloc(10000);
+  template_render(tmpl, html);
+  response_send_html(req, STATUS_OK, html);
+  free(html);
+  template_free(tmpl);
 }

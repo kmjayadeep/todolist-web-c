@@ -296,3 +296,67 @@ void response_send_html(request *req, char* status, char *html) {
   char headers[] = "Content-Type: text/html";
   response_send(req, status, headers, html);
 }
+
+html_template* template_create(char* file_name) {
+  html_template *tmpl = malloc(sizeof(*tmpl));
+
+  FILE *file = fopen(file_name, "r");
+  if(file == NULL) {
+    return NULL;
+  }
+
+  fseek(file, 0, SEEK_END);
+  unsigned long size = ftell(file);
+  rewind(file);
+
+  tmpl->template_content = malloc(size + 1);
+  if(fread(tmpl->template_content, 1, size, file) != size) {
+    free(tmpl->template_content);
+    fclose(file);
+    return NULL;
+  }
+
+  tmpl->template_content[size] = '\0';
+  tmpl->var_keys = malloc(20*sizeof(char*));
+  tmpl->var_values = malloc(20*sizeof(char*));
+  tmpl->var_size = 0;
+
+  return tmpl;
+}
+
+void template_free(html_template* tmpl) {
+  free(tmpl->template_content);
+  free(tmpl->var_keys);
+  free(tmpl->var_values);
+  free(tmpl);
+}
+
+void template_add_var(html_template *tmpl, char* key, char* value) {
+  size_t index = tmpl->var_size;
+  tmpl->var_keys[index] = key;
+  tmpl->var_values[index] = value;
+  tmpl->var_size++;
+}
+
+void template_render(html_template *tmpl, char* buffer) {
+  char *contents = tmpl->template_content;
+
+  unsigned long index = 0;
+  for(unsigned long i=0; i<strlen(contents) - 1; i++) {
+    if(contents[i] == '{' && contents[i+1] == '{') {
+      for(size_t j=0; j< tmpl->var_size; j++) {
+        char word[50];
+        sprintf(word, "{{%s}}", tmpl->var_keys[j]);
+        if(strncmp(contents + i, word, strlen(word)) == 0) {
+          strcpy(buffer + index, tmpl->var_values[j]);
+          index += strlen(tmpl->var_values[j]);
+          i+= strlen(word);
+          break;
+        }
+      }
+    }
+    buffer[index++] = contents[i];
+  }
+
+  buffer[index] = '\0';
+}

@@ -47,4 +47,16 @@ void response_send_text(request *req, char* status, char *text);
 void response_send_html(request *req, char* status, char *html);
 void response_send_json(request *req, char* status, cJSON *json);
 
+typedef struct {
+  char* template_content;
+  char** var_keys;
+  char** var_values;
+  size_t var_size;
+} html_template;
+
+html_template* template_create(char* file);
+void template_free(html_template* tmpl);
+void template_add_var(html_template *tmpl, char* key, char* value);
+void template_render(html_template *tmpl, char* buffer);
+
 #endif // !SERVER_H
