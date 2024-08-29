@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todolist
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: todolist
+  template:
+    metadata:
+      labels:
+        app: todolist
+    spec:
+      containers:
+        - name: todolist
+          image: ghcr.io/kmjayadeep/todolist-web-c:latest
+          resources:
+            requests:
+              memory: "20Mi"
+              cpu: "2m"
+            limits:
+              memory: "50Mi"
+              cpu: "25m"
+
